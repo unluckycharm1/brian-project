@@ -1,8 +1,7 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { ArrowUpDown, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import type { FormEvent } from 'react';
-import { useState } from 'react';
-import { useEffect } from 'react';
+import { useDeferredValue, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -18,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import studentsRoutes from '@/routes/students';
 
 type Student = {
     id: number;
@@ -81,19 +81,20 @@ export default function Students({ students }: Props) {
             toast.success(flash.success);
         }
     }, [flash?.success]);
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = useDeferredValue(search).trim().toLowerCase();
     const filteredStudents = students
-        .filter((student) =>
-            [
-                student.first_name,
-                student.last_name,
-                student.email,
-                student.program,
-                student.gender,
-                student.birthdate,
-                student.yr_level,
-            ].some((value) => String(value).toLowerCase().includes(normalizedSearch)),
-        )
+        .filter((student) => {
+            if (!normalizedSearch) {
+                return true;
+            }
+
+            const firstNameMatches = student.first_name.toLowerCase().startsWith(normalizedSearch);
+            const otherFieldsMatch = [student.email, student.program, student.gender, student.birthdate, student.yr_level].some((value) =>
+                String(value).toLowerCase().includes(normalizedSearch),
+            );
+
+            return firstNameMatches || otherFieldsMatch;
+        })
         .sort((firstStudent, secondStudent) => {
             if (sortOrder === 'year-asc' || sortOrder === 'year-desc') {
                 return sortOrder === 'year-asc'
@@ -110,23 +111,14 @@ export default function Students({ students }: Props) {
 
     const openCreate = () => {
         setEditingStudent(null);
-        form.reset();
-        form.setData('yr_level', '1');
+        form.clearErrors();
         setIsFormOpen(true);
     };
 
     const openEdit = (student: Student) => {
         setEditingStudent(student);
         setIsFormOpen(true);
-        form.setData({
-            first_name: student.first_name,
-            last_name: student.last_name,
-            email: student.email,
-            program: student.program,
-            gender: student.gender,
-            birthdate: student.birthdate.slice(0, 10),
-            yr_level: String(student.yr_level),
-        });
+        form.clearErrors();
     };
 
     const closeForm = () => {
@@ -137,6 +129,9 @@ export default function Students({ students }: Props) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
+        const values = Object.fromEntries(new FormData(event.currentTarget).entries()) as StudentForm;
+
+        form.transform(() => values);
         const options = {
             preserveState: false,
             preserveScroll: true,
@@ -151,15 +146,15 @@ export default function Students({ students }: Props) {
         };
 
         if (editingStudent) {
-            form.put(`/students/${editingStudent.id}`, options);
+            form.put(studentsRoutes.update.url(editingStudent.id), options);
         } else {
-            form.post('/students', options);
+            form.post(studentsRoutes.store.url(), options);
         }
     };
 
     const remove = (student: Student) => {
         if (window.confirm(`Delete ${student.first_name} ${student.last_name}?`)) {
-            form.delete(`/students/${student.id}`);
+            form.delete(studentsRoutes.destroy.url(student.id));
         }
     };
 
@@ -220,7 +215,7 @@ export default function Students({ students }: Props) {
                             </DialogDescription>
                         </DialogHeader>
                         <div>
-                            <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+                            <form key={`${editingStudent?.id ?? 'new'}-${isFormOpen}`} onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
                                 {Object.keys(form.errors).length > 0 && (
                                     <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive sm:col-span-2">
                                         Please correct the highlighted fields before saving.
@@ -238,9 +233,13 @@ export default function Students({ students }: Props) {
                                         <Label htmlFor={name}>{label}</Label>
                                         <Input
                                             id={name}
+                                            name={name}
                                             type={type}
-                                            value={form.data[name as keyof StudentForm]}
-                                            onChange={(event) => form.setData(name as keyof StudentForm, event.target.value)}
+                                            defaultValue={
+                                                name === 'birthdate'
+                                                    ? editingStudent?.birthdate.slice(0, 10)
+                                                    : (editingStudent?.[name as keyof Student] as string | number | undefined)
+                                            }
                                             required
                                         />
                                         <InputError message={form.errors[name as keyof StudentForm]} />
@@ -248,7 +247,7 @@ export default function Students({ students }: Props) {
                                 ))}
                                 <div className="grid gap-2">
                                     <Label htmlFor="yr_level">Year level</Label>
-                                    <Input id="yr_level" type="number" min="1" max="4" value={form.data.yr_level} onChange={(event) => form.setData('yr_level', event.target.value)} required />
+                                    <Input id="yr_level" name="yr_level" type="number" min="1" max="4" defaultValue={editingStudent?.yr_level ?? 1} required />
                                     <InputError message={form.errors.yr_level} />
                                 </div>
                                 <div className="flex gap-2 sm:col-span-2">
