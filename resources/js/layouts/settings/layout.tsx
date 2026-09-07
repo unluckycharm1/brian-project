@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
@@ -19,11 +18,6 @@ const sidebarNavItems: NavItem[] = [
     {
         title: 'Security',
         href: editSecurity(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
         icon: null,
     },
 ];
@@ -49,10 +43,10 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 key={`${toUrl(item.href)}-${index}`}
                                 size="sm"
                                 variant="ghost"
-                                asChild
                                 className={cn('w-full justify-start', {
                                     'bg-muted': isCurrentOrParentUrl(item.href),
                                 })}
+                                onClick={() => {}}
                             >
                                 <Link href={item.href}>
                                     {item.icon && (

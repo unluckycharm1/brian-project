@@ -1,24 +1,33 @@
 <?php
 
 use App\Http\Controllers\StudentController;
+use App\Models\Student;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-// 1. Changed URL to '/signup' and name to 'signup'
-Route::inertia('/signup', 'signup')->name('signup');
-
-// 2. Kept as the root URL '/'
-Route::get('/', function () {
-    return Inertia::render('Auth/login');
-})->name('home'); // It's best practice to name your login route 'login' so the auth middleware knows where to redirect unauthenticated users.
-
-
-Route::apiResource('/students', StudentController::class);
+Route::redirect('/', '/login')->name('home');
+Route::redirect('/signup', '/register')->name('signup');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', function () {
-        return Inertia::render('Dashboard');
+        return Inertia::render('dashboard', [
+            'studentCount' => Student::query()->count(),
+            'programCount' => Student::query()->distinct('program')->count('program'),
+            'yearLevelCounts' => Student::query()
+                ->selectRaw('yr_level, count(*) as total')
+                ->groupBy('yr_level')
+                ->orderBy('yr_level')
+                ->pluck('total', 'yr_level'),
+            'recentStudents' => Student::query()->latest()->limit(5)->get(),
+        ]);
     })->name('dashboard');
+
+    Route::resource('/students', StudentController::class)->only([
+        'index',
+        'store',
+        'update',
+        'destroy',
+    ]);
 });
 
 require __DIR__.'/settings.php';

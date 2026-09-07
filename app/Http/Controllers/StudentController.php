@@ -3,32 +3,58 @@
 namespace App\Http\Controllers;
 
 use App\Models\Student;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
 
 class StudentController extends Controller
 {
-    public function index()
+    public function index(): Response
     {
-        return Student::all();
+        return Inertia::render('students', [
+            'students' => Student::query()->latest()->get(),
+        ]);
     }
 
-    public function create()
+    public function store(Request $request): RedirectResponse
     {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'birthdate' => 'required|date|before:'.today(),
+            'email' => 'required|email|unique:students,email',
+            'program' => 'required|string|max:60',
+            'gender' => 'required|string|max:60',
+            'yr_level' => 'required|integer|min:1|max:4',
+        ]);
 
+        Student::create($validated);
+
+        return to_route('students.index')->with('success', 'Student added successfully.');
     }
 
-    public function store(Request $request) // Fixed 'request' capitalization and '$requst' typo
+    public function update(Request $request, Student $student): RedirectResponse
     {
+        $validated = $request->validate([
+            'first_name' => 'required|string|max:100',
+            'last_name' => 'required|string|max:100',
+            'birthdate' => 'required|date|before:'.today(),
+            'email' => 'required|email|unique:students,email,'.$student->id,
+            'program' => 'required|string|max:60',
+            'yr_level' => 'required|integer|min:1|max:4',
+            'gender' => 'required|string|max:60',
+        ]);
 
+        $student->update($validated);
+
+        return to_route('students.index')->with('success', 'Student updated successfully.');
     }
 
-    public function update(Request $request, Student $student) // Added missing space in 'public function' and capitalized 'Request'
+    public function destroy(Student $student): RedirectResponse
     {
+        $student->delete();
 
-    }
-
-    public function destroy(Student $student)
-    {
-        
+        return to_route('students.index')->with('success', 'Student deleted successfully.');
     }
 }
